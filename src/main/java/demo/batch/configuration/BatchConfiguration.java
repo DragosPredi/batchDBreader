@@ -3,13 +3,13 @@ package demo.batch.configuration;
 import demo.batch.infrastructure.ColumnRangePartitioner;
 import demo.batch.infrastructure.Customer;
 import demo.batch.infrastructure.CustomerRowMapper;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.Step;
+import org.springframework.batch.core.*;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.explore.JobExplorer;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.partition.PartitionHandler;
 import org.springframework.batch.core.repository.JobRepository;
@@ -75,9 +75,9 @@ public class BatchConfiguration implements ApplicationContextAware {
     public ColumnRangePartitioner partitioner() {
         ColumnRangePartitioner columnRangePartitioner = new ColumnRangePartitioner();
 
-        columnRangePartitioner.setColumn("id");
+        columnRangePartitioner.setColumn("tconst");
         columnRangePartitioner.setDataSource(this.dataSource);
-        columnRangePartitioner.setTable("customer");
+        columnRangePartitioner.setTable("crew");
 
         return columnRangePartitioner;
     }
@@ -104,23 +104,23 @@ public class BatchConfiguration implements ApplicationContextAware {
     @Bean
     @StepScope
     public JdbcPagingItemReader<Customer> pagingItemReader(
-            @Value("#{stepExecutionContext['minValue']}")Long minValue,
-            @Value("#{stepExecutionContext['maxValue']}")Long maxValue) {
+            @Value("#{stepExecutionContext['minValue']}")String minValue,
+            @Value("#{stepExecutionContext['maxValue']}")String maxValue) {
         System.out.println("reading " + minValue + " to " + maxValue);
         JdbcPagingItemReader<Customer> reader = new JdbcPagingItemReader<>();
 
         reader.setDataSource(this.dataSource);
-        reader.setFetchSize(250);
+        reader.setFetchSize(1000);
         reader.setRowMapper(new CustomerRowMapper());
 
         MySqlPagingQueryProvider queryProvider = new MySqlPagingQueryProvider();
-        queryProvider.setSelectClause("id, firstName, lastName, birthdate");
-        queryProvider.setFromClause("from customer");
-        queryProvider.setWhereClause("where id >= " + minValue + " and id <= " + maxValue);
+        queryProvider.setSelectClause("tconst, directors, writers");
+        queryProvider.setFromClause("from crew");
+        queryProvider.setWhereClause("where tconst >= " + minValue + " and tconst <= " + maxValue);
 
         Map<String, Order> sortKeys = new HashMap<>(1);
 
-        sortKeys.put("id", Order.ASCENDING);
+        sortKeys.put("tconst", Order.ASCENDING);
 
         queryProvider.setSortKeys(sortKeys);
 
@@ -149,7 +149,7 @@ public class BatchConfiguration implements ApplicationContextAware {
     @Bean
     public Step slaveStep() {
         return stepBuilderFactory.get("slaveStep")
-                .<Customer, Customer>chunk(250)
+                .<Customer, Customer>chunk(1000)
                 .reader(pagingItemReader(null, null))
                 .writer(writer())
                 .build();
@@ -157,8 +157,8 @@ public class BatchConfiguration implements ApplicationContextAware {
 
     @Bean
     @Profile("master")
-    public Job job() throws Exception {
-        return jobBuilderFactory.get("job")
+    public Job job2() throws Exception {
+        return jobBuilderFactory.get("job2")
                 .incrementer(new RunIdIncrementer())
                 .start(step1())
                 .build();
@@ -168,4 +168,5 @@ public class BatchConfiguration implements ApplicationContextAware {
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
     }
+
 }

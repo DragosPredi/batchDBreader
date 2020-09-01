@@ -54,24 +54,28 @@ public class ColumnRangePartitioner implements Partitioner {
      */
     @Override
     public Map<String, ExecutionContext> partition(int gridSize) {
-        int min = jdbcTemplate.queryForObject("SELECT MIN(" + column + ") from " + table, Integer.class);
-        int max = jdbcTemplate.queryForObject("SELECT MAX(" + column + ") from " + table, Integer.class);
-        int targetSize = (max - min) / gridSize + 1;
+        int targetSize = jdbcTemplate.queryForObject("SELECT COUNT(" + column + ") from " + table, Integer.class);
+        targetSize /= gridSize;
 
         Map<String, ExecutionContext> result = new HashMap<String, ExecutionContext>();
         int number = 0;
-        int start = min;
-        int end = start + targetSize - 1;
+        int start = 0;
+        int end = targetSize - 1;
 
-        while (start <= max) {
+
+        while (start <= targetSize) {
             ExecutionContext value = new ExecutionContext();
             result.put("partition" + number, value);
 
-            if (end >= max) {
-                end = max;
+            String min = jdbcTemplate.queryForObject("SELECT " + column + " from " + table + " GROUP BY " + column + " LIMIT " +
+                    start + ", " + "1", String.class);
+            String max = jdbcTemplate.queryForObject("SELECT " + column + " from " + table + " GROUP BY " + column + " LIMIT " +
+                    end + ", " + "1", String.class);
+            if (end >= targetSize) {
+                end = targetSize;
             }
-            value.putInt("minValue", start);
-            value.putInt("maxValue", end);
+            value.putString("minValue", min);
+            value.putString("maxValue", max);
             start += targetSize;
             end += targetSize;
             number++;
